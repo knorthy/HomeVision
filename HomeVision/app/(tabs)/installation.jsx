@@ -5,407 +5,654 @@ import {
   StyleSheet,
   TouchableOpacity,
   Text,
-  Modal,
   ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-
-const ROOM_IMAGE =
-  "https://m.media-amazon.com/images/I/919Jj69lpqL._AC_SX679_.jpg";
+import { hp, wp } from '../../helpers/common';
 
 const PRODUCTS = [
   {
     id: 1,
     name: "Carrier 1.0HP Inverter Window AC",
     price: 25662,
-    position: { top: "18%", left: "8%" },
+    image: "https://images.unsplash.com/photo-1585811555431-6e854e16cf7b?w=400&h=400&fit=crop",
+    hot: true,
+    specs: {
+      type: "Window Type",
+      capacity: "1.0 HP",
+      coverage: "12-15 sqm",
+      color: "White",
+      dimensions: "52 x 38 x 30 cm"
+    },
+    description: "Energy-efficient inverter technology for optimal cooling and lower electricity bills."
   },
   {
     id: 2,
     name: "Condura 6.3cu ft Inverter Two Door",
     price: 16578,
-    position: { top: "30%", right: "10%" },
+    image: "https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?w=400&h=400&fit=crop",
+    hot: true,
+    specs: {
+      capacity: "6.3 cubic feet",
+      type: "Two Door",
+      color: "Silver",
+      dimensions: "144 x 55 x 60 cm",
+      features: "Inverter, Frost-free"
+    },
+    description: "Spacious refrigerator with inverter technology for energy savings and consistent cooling."
   },
   {
     id: 3,
-    name: "#04 Honor 400 5G 512GB/ 12GB",
+    name: "Honor 400 5G 512GB/12GB",
     price: 22999,
-    position: { bottom: "22%", left: "15%" },
+    image: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=400&h=400&fit=crop",
+    hot: true,
+    specs: {
+      storage: "512GB",
+      ram: "12GB",
+      network: "5G",
+      color: "Midnight Black",
+      display: "6.7 inches AMOLED"
+    },
+    description: "Flagship smartphone with powerful performance, ample storage, and blazing-fast 5G connectivity."
   },
   {
     id: 4,
     name: "Apple iPad A16 11th Gen WiFi",
     price: 28490,
-    position: { bottom: "20%", right: "12%" },
-  },
+    image: "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=400&h=400&fit=crop",
+    hot: false,
+    specs: {
+      processor: "A16 Bionic",
+      display: "11 inches Liquid Retina",
+      storage: "128GB",
+      color: "Space Gray",
+      connectivity: "WiFi 6E"
+    },
+    description: "Powerful tablet with stunning display, perfect for productivity and creative work."
+  }
 ];
 
-const MONTH_OPTIONS = [6, 9, 12, 18, 24];
+const MONTH_OPTIONS = [6, 12, 18, 24];
 
-// Total of ALL items (pre-calculated for performance & clarity)
-const ALL_ITEMS_TOTAL = PRODUCTS.reduce((sum, p) => sum + p.price, 0);
-
-export default function InstallationScreen() {
-  const [selectedItems, setSelectedItems] = useState([]);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [downPayment, setDownPayment] = useState(4462);
+export default function InstallmentSimulator() {
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [downPayment, setDownPayment] = useState(5000);
   const [selectedMonths, setSelectedMonths] = useState(12);
 
-  const totalPrice = selectedItems.reduce((sum, id) => {
-    const item = PRODUCTS.find((p) => p.id === id);
-    return sum + (item ? item.price : 0);
-  }, 0);
+  const allItemsTotal = PRODUCTS.reduce((sum, p) => sum + p.price, 0);
 
-  const toggleItem = (id) => {
-    setSelectedItems((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
-  };
-
-  const selectAll = () => {
-    setSelectedItems(PRODUCTS.map(p => p.id));
-  };
-
-  const calculateMonthly = (price) => {
+  const calculateMonthly = (price, months = selectedMonths) => {
     const remaining = price - downPayment;
-    const monthly = selectedMonths === 0 ? 0 : remaining / selectedMonths;
-    return monthly > 0 ? Math.round(monthly) : 0;
+    return remaining > 0 ? Math.ceil(remaining / months) : 0;
   };
 
-  const allItemsMonthly = calculateMonthly(ALL_ITEMS_TOTAL);
+  const selectedProductData = selectedProduct 
+    ? PRODUCTS.find(p => p.id === selectedProduct)
+    : null;
+
+  const handleProductClick = (productId) => {
+    setSelectedProduct(productId);
+  };
+
+  const handleAllItemsClick = () => {
+    setSelectedProduct(null);
+  };
+
+  // Determine what to show based on selection
+  const showAllItemsPackage = selectedProduct === null;
+  const currentPrice = showAllItemsPackage ? allItemsTotal : selectedProductData?.price || 0;
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.logo}>HOME CREDIT</Text>
-        <Text style={styles.title}>Installment Simulator</Text>
-      </View>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Section Title */}
+        <View style={styles.titleContainer}>
+          <Text style={styles.mainTitle}>HomeVision</Text>
+        </View>
 
-      {/* Room Image with Overlays */}
-      <View style={styles.imageContainer}>
-        <Image source={{ uri: ROOM_IMAGE }} style={styles.roomImage} resizeMode="cover" />
-        {PRODUCTS.map((product) => {
-          const isSelected = selectedItems.includes(product.id);
-          return (
+        {/* Horizontal Product Scroll */}
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          style={styles.productScroll}
+          contentContainerStyle={styles.productScrollContent}
+        >
+          {/* All Items Card */}
+          <TouchableOpacity
+            onPress={handleAllItemsClick}
+            style={[
+              styles.productCard,
+              selectedProduct === null && styles.productCardSelected
+            ]}
+          >
+            <View style={styles.productImageContainer}>
+              <View style={styles.allItemsBadge}>
+                <Ionicons name="cart" size={hp(2.5)} color="#fff" />
+                <Text style={styles.allItemsText}>ALL</Text>
+              </View>
+              <View style={styles.allItemsImageContainer}>
+                <Ionicons name="apps" size={hp(12)} color="#E31E24" />
+              </View>
+            </View>
+            <View style={styles.productInfo}>
+              <Text style={styles.productName} numberOfLines={2}>
+                Complete Package Deal
+              </Text>
+              <Text style={styles.asLowAs}>as low as</Text>
+              <Text style={styles.productPrice}>
+                ₱{calculateMonthly(allItemsTotal).toLocaleString()} x {selectedMonths}months
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Individual Products */}
+          {PRODUCTS.map((product) => (
             <TouchableOpacity
               key={product.id}
+              onPress={() => handleProductClick(product.id)}
               style={[
-                styles.overlayButton,
-                product.position,
-                isSelected && styles.overlayButtonActive,
+                styles.productCard,
+                selectedProduct === product.id && styles.productCardSelected
               ]}
-              onPress={() => {
-                toggleItem(product.id);
-                setModalVisible(true);
-              }}
             >
-              <View style={styles.overlayContent}>
-                <Ionicons
-                  name={isSelected ? "checkmark-circle" : "add-circle-outline"}
-                  size={32}
-                  color="#fff"
-                />
-                <Text style={styles.overlayPrice}>₱{product.price.toLocaleString()}</Text>
-                <Text style={styles.overlayName} numberOfLines={2}>
+              <View style={styles.productImageContainer}>
+                {product.hot && (
+                  <View style={styles.hotBadge}>
+                    <Ionicons name="flame" size={hp(2)} color="#fff" />
+                    <Text style={styles.hotText}>Hot</Text>
+                  </View>
+                )}
+                <Image source={{ uri: product.image }} style={styles.productImage} />
+              </View>
+              <View style={styles.productInfo}>
+                <Text style={styles.productName} numberOfLines={2}>
                   {product.name}
                 </Text>
+                <Text style={styles.asLowAs}>as low as</Text>
+                <Text style={styles.productPrice}>
+                  ₱{calculateMonthly(product.price).toLocaleString()} x {selectedMonths}months
+                </Text>
               </View>
             </TouchableOpacity>
-          );
-        })}
-      </View>
+          ))}
+        </ScrollView>
 
-      {/* Bottom Bar */}
-      {selectedItems.length > 0 && (
-        <View style={styles.bottomBar}>
-          <Text style={styles.bottomBarText}>
-            {selectedItems.length} item{selectedItems.length > 1 ? "s" : ""} selected • Total ₱
-            {totalPrice.toLocaleString()}
-          </Text>
-          <TouchableOpacity style={styles.viewButton} onPress={() => setModalVisible(true)}>
-            <Text style={styles.viewButtonText}>View Installments</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+        {/* Installment Simulator Card */}
+        <View style={styles.packageCard}>
+          <View style={styles.packageHeader}>
+            <View style={styles.packageIconContainer}>
+              <Ionicons 
+                name={showAllItemsPackage ? "cart" : "cube"} 
+                size={hp(3)} 
+                color="#E31E24" 
+              />
+            </View>
+            <View style={styles.packageHeaderText}>
+              <Text style={styles.packageTitle}>
+                {showAllItemsPackage ? "Complete Package Deal" : selectedProductData?.name}
+              </Text>
+              <Text style={styles.packageSubtitle}>
+                {showAllItemsPackage 
+                  ? "All 4 premium items • Best value" 
+                  : "Individual item"}
+              </Text>
+            </View>
+          </View>
 
-      {/* Modal */}
-      <Modal visible={modalVisible} animationType="slide" transparent={true}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Choose your installment plan</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={28} color="#666" />
+          {/* Product Details (Only for Individual Items) */}
+          {!showAllItemsPackage && selectedProductData && (
+            <>
+              <Image 
+                source={{ uri: selectedProductData.image }} 
+                style={styles.detailImage}
+              />
+              
+              <Text style={styles.detailDescription}>{selectedProductData.description}</Text>
+
+              {/* Specifications */}
+              <View style={styles.specsContainer}>
+                <Text style={styles.specsTitle}>Specifications</Text>
+                {Object.entries(selectedProductData.specs).map(([key, value]) => (
+                  <View key={key} style={styles.specRow}>
+                    <Text style={styles.specKey}>{key}:</Text>
+                    <Text style={styles.specValue}>{value}</Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
+
+          <View style={[
+            styles.packagePriceContainer,
+            !showAllItemsPackage && styles.individualPriceContainer
+          ]}>
+            <Text style={styles.packagePriceLabel}>
+              {showAllItemsPackage ? "Total Package Price" : "Item Price"}
+            </Text>
+            <Text style={[
+              styles.packageTotalPrice,
+              !showAllItemsPackage && styles.individualTotalPrice
+            ]}>
+              ₱{currentPrice.toLocaleString()}
+            </Text>
+            <Text style={styles.packageMonthlyPrice}>
+              ₱{calculateMonthly(currentPrice).toLocaleString()}/month for {selectedMonths} months
+            </Text>
+          </View>
+
+          {/* Down Payment Control */}
+          <View style={styles.downPaymentSection}>
+            <Text style={styles.sectionLabel}>Down Payment</Text>
+            <View style={styles.downPaymentControl}>
+              <TouchableOpacity
+                onPress={() => setDownPayment(Math.max(0, downPayment - 500))}
+                style={styles.controlButton}
+              >
+                <Ionicons name="remove" size={hp(3)} color="#fff" />
+              </TouchableOpacity>
+              <Text style={styles.downPaymentAmount}>₱{downPayment.toLocaleString()}</Text>
+              <TouchableOpacity
+                onPress={() => setDownPayment(downPayment + 500)}
+                style={styles.controlButton}
+              >
+                <Ionicons name="add" size={hp(3)} color="#fff" />
               </TouchableOpacity>
             </View>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {/* NEW: All Items Package Card */}
-              <View style={styles.allItemsCard}>
-                <Text style={styles.allItemsTitle}>Get Your Complete Dream Room</Text>
-                <Text style={styles.allItemsSubtitle}>All 4 items • Best value</Text>
-                <Text style={styles.allItemsPrice}>₱{ALL_ITEMS_TOTAL.toLocaleString()}</Text>
-                <Text style={styles.allItemsMonthly}>
-                  Only ₱{allItemsMonthly.toLocaleString()}/mo for {selectedMonths} months
-                </Text>
-                <TouchableOpacity style={styles.selectAllBtn} onPress={selectAll}>
-                  <Text style={styles.selectAllText}>Select All Items</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Divider */}
-              <View style={styles.divider} />
-
-              {/* Selected Items List */}
-              {selectedItems.length === 0 ? (
-                <Text style={{ textAlign: "center", color: "#999", marginTop: 20 }}>
-                  Tap items on the room to add them
-                </Text>
-              ) : (
-                PRODUCTS.filter((p) => selectedItems.includes(p.id)).map((item) => (
-                  <View key={item.id} style={styles.itemRow}>
-                    <Text style={styles.itemName}>{item.name}</Text>
-                    <View>
-                      <Text style={styles.itemPrice}>₱{item.price.toLocaleString()}</Text>
-                      <Text style={styles.itemMonthly}>
-                        ≈ ₱{calculateMonthly(item.price)}/mo
-                      </Text>
-                    </View>
-                  </View>
-                ))
-              )}
-
-              {/* Combined Total (only if >1 item) */}
-              {selectedItems.length > 1 && (
-                <>
-                  <View style={styles.divider} />
-                  <View style={styles.totalSection}>
-                    <Text style={styles.totalLabel}>Combined Total</Text>
-                    <Text style={styles.totalAmount}>₱{totalPrice.toLocaleString()}</Text>
-                  </View>
-
-                  <View style={styles.downPaymentSection}>
-                    <Text style={styles.sectionTitle}>Preferred down payment</Text>
-                    <View style={styles.downPaymentControl}>
-                      <TouchableOpacity
-                        onPress={() => setDownPayment(Math.max(0, downPayment - 500))}
-                      >
-                        <Ionicons name="remove-circle-outline" size={36} color="#E31E24" />
-                      </TouchableOpacity>
-                      <Text style={styles.downPaymentAmount}>₱{downPayment.toLocaleString()}</Text>
-                      <TouchableOpacity onPress={() => setDownPayment(downPayment + 500)}>
-                        <Ionicons name="add-circle-outline" size={36} color="#E31E24" />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  <View style={styles.monthlyTotal}>
-                    <Text style={styles.monthlyLabel}>
-                      Monthly for {selectedMonths} months
-                    </Text>
-                    <Text style={styles.monthlyAmount}>
-                      ₱{calculateMonthly(totalPrice).toLocaleString()}/mo
-                    </Text>
-                  </View>
-                </>
-              )}
-
-              {/* Term Selector */}
-              <View style={styles.termSection}>
-                <Text style={styles.sectionTitle}>Select monthly installment plan</Text>
-                <View style={styles.termButtons}>
-                  {MONTH_OPTIONS.map((months) => (
-                    <TouchableOpacity
-                      key={months}
-                      style={[
-                        styles.termButton,
-                        selectedMonths === months && styles.termButtonActive,
-                      ]}
-                      onPress={() => setSelectedMonths(months)}
-                    >
-                      <Text
-                        style={[
-                          styles.termText,
-                          selectedMonths === months && styles.termTextActive,
-                        ]}
-                      >
-                        {months}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            </ScrollView>
-
-            <TouchableOpacity style={styles.applyButton}>
-              <Text style={styles.applyButtonText}>Apply with Home Credit</Text>
-            </TouchableOpacity>
           </View>
+
+          {/* Payment Breakdown */}
+          <View style={styles.breakdownContainer}>
+            <View style={styles.breakdownRow}>
+              <Text style={styles.breakdownLabel}>
+                {showAllItemsPackage ? "Package Total:" : "Item Price:"}
+              </Text>
+              <Text style={styles.breakdownValue}>₱{currentPrice.toLocaleString()}</Text>
+            </View>
+            <View style={styles.breakdownRow}>
+              <Text style={styles.breakdownLabel}>Down Payment:</Text>
+              <Text style={styles.breakdownValue}>-₱{downPayment.toLocaleString()}</Text>
+            </View>
+            <View style={[styles.breakdownRow, styles.breakdownTotal]}>
+              <Text style={styles.breakdownTotalLabel}>Amount to Finance:</Text>
+              <Text style={styles.breakdownTotalValue}>
+                ₱{(currentPrice - downPayment).toLocaleString()}
+              </Text>
+            </View>
+          </View>
+
+          {/* Term Selection */}
+          <View style={styles.termSection}>
+            <Text style={styles.sectionLabel}>Select Installment Plan</Text>
+            <View style={styles.termGrid}>
+              {MONTH_OPTIONS.map((months) => {
+                const monthly = calculateMonthly(currentPrice, months);
+                return (
+                  <TouchableOpacity
+                    key={months}
+                    onPress={() => setSelectedMonths(months)}
+                    style={[
+                      styles.termButton,
+                      selectedMonths === months && styles.termButtonActive
+                    ]}
+                  >
+                    <Text style={styles.termMonths}>{months}</Text>
+                    <Text style={styles.termMonthsLabel}>months</Text>
+                    <Text style={styles.termMonthlyPrice}>₱{monthly.toLocaleString()}/mo</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          <TouchableOpacity style={styles.applyButton}>
+            <Text style={styles.applyButtonText}>
+              {showAllItemsPackage ? "Apply for Complete Package" : "Apply for This Item"}
+            </Text>
+          </TouchableOpacity>
         </View>
-      </Modal>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
-// Add these new styles
 const styles = StyleSheet.create({
-  // ... (keep all your existing styles)
-
-  allItemsCard: {
-    backgroundColor: "#FFE5E5",
-    padding: 20,
-    borderRadius: 16,
-    alignItems: "center",
-    marginBottom: 10,
-    borderWidth: 2,
+  container: {
+    flex: 1,
+    backgroundColor: "#f5f5f5",
+  },
+  scrollView: {
+    flex: 1,
+  },
+  titleContainer: {
+    paddingHorizontal: wp(5),
+    paddingTop: hp(2.5),
+    paddingBottom: hp(2),
+  },
+  mainTitle: {
+    fontSize: hp(3.5),
+    fontWeight: "bold",
+    color: "#333",
+  },
+  productScroll: {
+    marginBottom: hp(2.5),
+  },
+  productScrollContent: {
+    paddingHorizontal: wp(5),
+    gap: wp(4),
+  },
+  productCard: {
+    backgroundColor: "#fff",
+    borderRadius: wp(3),
+    width: wp(70),
+    marginRight: wp(4),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  productCardSelected: {
+    borderWidth: 3,
     borderColor: "#E31E24",
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  allItemsTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#E31E24",
+  productImageContainer: {
+    position: "relative",
   },
-  allItemsSubtitle: {
-    fontSize: 14,
-    color: "#666",
-    marginVertical: 4,
-  },
-  allItemsPrice: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#E31E24",
-    marginVertical: 8,
-  },
-  allItemsMonthly: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#E31E24",
-    marginBottom: 12,
-  },
-  selectAllBtn: {
+  hotBadge: {
+    position: "absolute",
+    top: hp(1.5),
+    left: wp(3),
     backgroundColor: "#E31E24",
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 30,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.8),
+    borderRadius: wp(5),
+    gap: wp(1),
+    zIndex: 10,
   },
-  selectAllText: {
+  hotText: {
     color: "#fff",
     fontWeight: "bold",
-    fontSize: 16,
+    fontSize: hp(1.5),
   },
-
-  // Keep all your other existing styles below...
-  container: { flex: 1, backgroundColor: "#f5f5f5" },
-  header: {
-    backgroundColor: "#E31E24",
-    padding: 16,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  logo: { color: "#fff", fontWeight: "bold", fontSize: 18 },
-  title: { color: "#fff", fontSize: 14, fontWeight: "600" },
-  imageContainer: { position: "relative", margin: 20 },
-  roomImage: { width: "100%", height: 500, borderRadius: 16 },
-  overlayButton: {
+  allItemsBadge: {
     position: "absolute",
-    backgroundColor: "rgba(227, 30, 36, 0.9)",
-    padding: 12,
-    borderRadius: 16,
-    borderWidth: 3,
-    borderColor: "#fff",
-    alignItems: "center",
-    minWidth: 100,
-  },
-  overlayButtonActive: { backgroundColor: "#E31E24", transform: [{ scale: 1.1 }] },
-  overlayContent: { alignItems: "center" },
-  overlayPrice: { color: "#fff", fontWeight: "bold", fontSize: 16, marginVertical: 4 },
-  overlayName: { color: "#fff", fontSize: 10, textAlign: "center" },
-  bottomBar: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    top: hp(1.5),
+    left: wp(3),
     backgroundColor: "#E31E24",
-    marginHorizontal: 20,
-    padding: 16,
-    borderRadius: 12,
-    position: "absolute",
-    bottom: 30,
-    left: 20,
-    right: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.8),
+    borderRadius: wp(5),
+    gap: wp(1),
+    zIndex: 10,
   },
-  bottomBarText: { color: "#fff", fontWeight: "bold" },
-  viewButton: { backgroundColor: "#fff", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 },
-  viewButtonText: { color: "#E31E24", fontWeight: "bold" },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.8)",
-    justifyContent: "flex-end",
+  allItemsText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: hp(1.5),
   },
-  modalContainer: {
+  allItemsImageContainer: {
+    width: "100%",
+    height: hp(28),
+    backgroundColor: "#FFE5E5",
+    borderTopLeftRadius: wp(3),
+    borderTopRightRadius: wp(3),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  productImage: {
+    width: "100%",
+    height: hp(28),
+    borderTopLeftRadius: wp(3),
+    borderTopRightRadius: wp(3),
+  },
+  productInfo: {
+    padding: wp(4),
+  },
+  productName: {
+    fontWeight: "600",
+    fontSize: hp(1.9),
+    color: "#333",
+    marginBottom: hp(1),
+    height: hp(5),
+  },
+  asLowAs: {
+    fontSize: hp(1.5),
+    color: "#666",
+    marginBottom: hp(0.5),
+  },
+  productPrice: {
+    fontSize: hp(2.4),
+    fontWeight: "bold",
+    color: "#2563eb",
+  },
+  packageCard: {
     backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: "90%",
+    marginHorizontal: wp(5),
+    marginBottom: hp(4),
+    borderRadius: wp(4),
+    padding: wp(5),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  modalHeader: {
+  packageHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: hp(2.5),
+    gap: wp(3),
+  },
+  packageIconContainer: {
+    width: wp(12),
+    height: wp(12),
+    backgroundColor: "#FFE5E5",
+    borderRadius: wp(6),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  packageHeaderText: {
+    flex: 1,
+  },
+  packageTitle: {
+    fontSize: hp(2.4),
+    fontWeight: "bold",
+    color: "#333",
+  },
+  packageSubtitle: {
+    fontSize: hp(1.6),
+    color: "#666",
+    marginTop: hp(0.3),
+  },
+  detailImage: {
+    width: "100%",
+    height: hp(35),
+    borderRadius: wp(3),
+    marginBottom: hp(2),
+  },
+  detailDescription: {
+    fontSize: hp(1.7),
+    color: "#666",
+    lineHeight: hp(2.5),
+    marginBottom: hp(2),
+  },
+  specsContainer: {
+    backgroundColor: "#f5f5f5",
+    borderRadius: wp(3),
+    padding: wp(4),
+    marginBottom: hp(2.5),
+  },
+  specsTitle: {
+    fontSize: hp(1.9),
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: hp(1.5),
+  },
+  specRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 10,
+    paddingVertical: hp(1),
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
   },
-  modalTitle: { fontSize: 20, fontWeight: "bold" },
-  itemRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 12 },
-  itemName: { flex: 1, fontSize: 14 },
-  itemPrice: { fontWeight: "bold", color: "#E31E24" },
-  itemMonthly: { fontSize: 12, color: "#666" },
-  divider: { height: 1, backgroundColor: "#eee", marginVertical: 16 },
-  totalSection: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 8 },
-  totalLabel: { fontSize: 16 },
-  totalAmount: { fontSize: 20, fontWeight: "bold", color: "#E31E24" },
-  downPaymentSection: { marginVertical: 20 },
-  sectionTitle: { fontWeight: "bold", marginBottom: 12, fontSize: 16 },
+  specKey: {
+    fontSize: hp(1.6),
+    color: "#666",
+    textTransform: "capitalize",
+  },
+  specValue: {
+    fontSize: hp(1.6),
+    fontWeight: "600",
+    color: "#333",
+  },
+  packagePriceContainer: {
+    backgroundColor: "#FFE5E5",
+    borderRadius: wp(3),
+    padding: wp(5),
+    marginBottom: hp(2.5),
+  },
+  individualPriceContainer: {
+    backgroundColor: "#E3F2FD",
+  },
+  packagePriceLabel: {
+    fontSize: hp(1.5),
+    color: "#666",
+    marginBottom: hp(0.5),
+  },
+  packageTotalPrice: {
+    fontSize: hp(4.5),
+    fontWeight: "bold",
+    color: "#E31E24",
+    marginBottom: hp(1),
+  },
+  individualTotalPrice: {
+    color: "#2563eb",
+  },
+  packageMonthlyPrice: {
+    fontSize: hp(2.2),
+    fontWeight: "bold",
+    color: "#333",
+  },
+  downPaymentSection: {
+    marginBottom: hp(2.5),
+  },
+  sectionLabel: {
+    fontSize: hp(1.8),
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: hp(1.5),
+  },
   downPaymentControl: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#f9f9f9",
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: "#f5f5f5",
+    borderRadius: wp(3),
+    padding: wp(4),
   },
-  downPaymentAmount: { fontSize: 24, fontWeight: "bold" },
-  monthlyTotal: {
-    backgroundColor: "#fff0f0",
-    padding: 16,
-    borderRadius: 12,
+  controlButton: {
+    width: wp(10),
+    height: wp(10),
+    backgroundColor: "#E31E24",
+    borderRadius: wp(5),
     alignItems: "center",
-    marginVertical: 10,
+    justifyContent: "center",
   },
-  monthlyLabel: { fontSize: 16, color: "#666" },
-  monthlyAmount: { fontSize: 28, fontWeight: "bold", color: "#E31E24", marginTop: 8 },
-  termSection: { marginVertical: 20 },
-  termButtons: { flexDirection: "row", flexWrap: "wrap", gap: 12, justifyContent: "center" },
+  downPaymentAmount: {
+    fontSize: hp(3),
+    fontWeight: "bold",
+    color: "#333",
+  },
+  breakdownContainer: {
+    backgroundColor: "#f5f5f5",
+    borderRadius: wp(3),
+    padding: wp(4),
+    marginBottom: hp(2.5),
+  },
+  breakdownRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: hp(0.8),
+  },
+  breakdownLabel: {
+    fontSize: hp(1.6),
+    color: "#666",
+  },
+  breakdownValue: {
+    fontSize: hp(1.6),
+    fontWeight: "600",
+    color: "#333",
+  },
+  breakdownTotal: {
+    borderTopWidth: 1,
+    borderTopColor: "#ddd",
+    marginTop: hp(1),
+    paddingTop: hp(1.5),
+  },
+  breakdownTotalLabel: {
+    fontSize: hp(1.8),
+    fontWeight: "bold",
+    color: "#333",
+  },
+  breakdownTotalValue: {
+    fontSize: hp(1.8),
+    fontWeight: "bold",
+    color: "#333",
+  },
+  termSection: {
+    marginBottom: hp(2.5),
+  },
+  termGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: wp(3),
+  },
   termButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderWidth: 1,
+    width: "48%",
+    backgroundColor: "#fff",
+    borderWidth: 2,
     borderColor: "#ddd",
-    borderRadius: 8,
-    minWidth: 60,
+    borderRadius: wp(3),
+    padding: wp(3),
     alignItems: "center",
   },
-  termButtonActive: { backgroundColor: "#E31E24", borderColor: "#E31E24" },
-  termText: { fontWeight: "bold" },
-  termTextActive: { color: "#fff" },
+  termButtonActive: {
+    backgroundColor: "#FFE5E5",
+    borderColor: "#E31E24",
+  },
+  termMonths: {
+    fontSize: hp(2.5),
+    fontWeight: "bold",
+    color: "#333",
+  },
+  termMonthsLabel: {
+    fontSize: hp(1.3),
+    color: "#666",
+    marginBottom: hp(0.5),
+  },
+  termMonthlyPrice: {
+    fontSize: hp(1.7),
+    fontWeight: "bold",
+    color: "#E31E24",
+  },
   applyButton: {
     backgroundColor: "#E31E24",
-    padding: 18,
-    borderRadius: 12,
+    padding: wp(4.5),
+    borderRadius: wp(3),
     alignItems: "center",
-    marginTop: 20,
   },
-  applyButtonText: { color: "#fff", fontWeight: "bold", fontSize: 18 },
+  applyButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: hp(2),
+  },
 });
