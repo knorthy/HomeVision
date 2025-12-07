@@ -1,5 +1,5 @@
-import { useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useLocalSearchParams, router } from 'expo-router';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,50 +8,109 @@ import {
   ScrollView,
   StyleSheet,
   SafeAreaView,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { hp, wp } from '../../helpers/common';
+
+const BACKEND_RESULTS_URL = 'http://192.168.68.119:8000/design-results';
 
 export default function WAIsResult() {
-  const { imageUri } = useLocalSearchParams();
+  const params = useLocalSearchParams();
+  const { designId, generatedImageUri } = params;
+  
+  const [loading, setLoading] = useState(true);
+  const [designImage, setDesignImage] = useState(generatedImageUri || null);
+  const [detectedItems, setDetectedItems] = useState([]);
 
-  // Sample items detected in the redesigned room (you'll get this from AI later)
-  const detectedItems = [
-    {
-      id: 1,
-      name: 'Samsung 65" QLED 4K Smart TV',
-      price: '₱3,999 x 24 months',
-      image: 'https://images.samsung.com/is/image/samsung/p6pim/ph/qa65q60cawxxp/gallery/ph-qled-q60c-qa65q60cakxxp-536495897?$650_519_PNG$',
-    },
-    {
-      id: 2,
-      name: 'Modern L-Shaped Fabric Sofa',
-      price: '₱1,899 x 24 months',
-      image: 'https://m.media-amazon.com/images/I/71fV7g3X6YL._AC_SL1500_.jpg',
-    },
-    {
-      id: 3,
-      name: 'Minimalist Coffee Table',
-      price: '₱599 x 12 months',
-      image: 'https://m.media-amazon.com/images/I/81fK3+CzM+L._AC_SL1500_.jpg',
-    },
-    {
-      id: 4,
-      name: 'LED Floor Lamp with Remote',
-      price: '₱899 x 12 months',
-      image: 'https://m.media-amazon.com/images/I/71yM1eZ9k+L._AC_SL1500_.jpg',
-    },
-  ];
+  useEffect(() => {
+    fetchDesignResults();
+  }, [designId]);
+
+  const fetchDesignResults = async () => {
+    if (!designId) {
+      Alert.alert('Error', 'No design ID provided');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${BACKEND_RESULTS_URL}/${designId}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch design results');
+      }
+
+      const data = await response.json();
+      
+      // Expected response format:
+      // {
+      //   designImageUrl: "url_to_ai_generated_image",
+      //   items: [
+      //     { id, name, price, installment, image },
+      //     ...
+      //   ]
+      // }
+      
+      if (data.designImageUrl) {
+        setDesignImage(data.designImageUrl);
+      }
+      
+      setDetectedItems(data.items || []);
+      
+    } catch (error) {
+      Alert.alert('Error', error.message || 'Failed to load design results');
+      setDetectedItems([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCalculateInstallment = () => {
+    if (detectedItems.length === 0) {
+      Alert.alert('No Items', 'No items available to calculate installment');
+      return;
+    }
+    
+    // Navigate to installation calculator with the items
+    router.push({
+      pathname: '/(tabs)/installation',
+      params: { 
+        items: JSON.stringify(detectedItems),
+        designId: designId 
+      },
+    });
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#E31E24" />
+          <Text style={styles.loadingText}>Loading your design...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Redesigned Room Image */}
+        {/* AI-Generated Redesigned Room Image */}
         <View style={styles.imageContainer}>
-          <Image
-            source={{ uri: imageUri }}
-            style={styles.redesignedImage}
-            resizeMode="cover"
-          />
+          {designImage ? (
+            <Image
+              source={{ uri: designImage }}
+              style={styles.redesignedImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={[styles.redesignedImage, styles.placeholderImage]}>
+              <Ionicons name="image-outline" size={80} color="#ccc" />
+              <Text style={styles.placeholderText}>No design image available</Text>
+            </View>
+          )}
           <View style={styles.overlay}>
             <Ionicons name="sparkles" size={32} color="#fff" />
             <Text style={styles.overlayText}>Your Dream Room by HomeVision</Text>
@@ -61,33 +120,46 @@ export default function WAIsResult() {
         {/* Title */}
         <View style={styles.header}>
           <Text style={styles.title}>Items in Your Design</Text>
-          <Text style={styles.subtitle}>Tap any item to view installment plans</Text>
+          <Text style={styles.subtitle}>
+            {detectedItems.length > 0 
+              ? 'Tap any item to view installment plans'
+              : 'No items detected yet'}
+          </Text>
         </View>
 
         {/* Vertical List of Items */}
         <View style={styles.itemsList}>
-          {detectedItems.map((item) => (
-            <TouchableOpacity key={item.id} style={styles.itemCard}>
-              <Image source={{ uri: item.image }} style={styles.itemImage} />
-              <View style={styles.itemInfo}>
-                <Text style={styles.itemName} numberOfLines={2}>
-                  {item.name}
-                </Text>
-                <Text style={styles.itemPrice}>as low as</Text>
-                <Text style={styles.priceAmount}>{item.price}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={28} color="#ccc" />
-            </TouchableOpacity>
-          ))}
+          {detectedItems.length > 0 ? (
+            detectedItems.map((item) => (
+              <TouchableOpacity key={item.id} style={styles.itemCard}>
+                <Image source={{ uri: item.image }} style={styles.itemImage} />
+                <View style={styles.itemInfo}>
+                  <Text style={styles.itemName} numberOfLines={2}>
+                    {item.name}
+                  </Text>
+                  <Text style={styles.itemPrice}>as low as</Text>
+                  <Text style={styles.priceAmount}>{item.installment || item.price}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={28} color="#ccc" />
+              </TouchableOpacity>
+            ))
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="cube-outline" size={64} color="#ccc" />
+              <Text style={styles.emptyText}>No items found in this design</Text>
+            </View>
+          )}
         </View>
       </ScrollView>
 
       {/* Rectangular FAB Button */}
-      <TouchableOpacity style={styles.fab}>
-        <Ionicons name="calculator-outline" size={26} color="#fff" />
-        <Text style={styles.fabText}>Calculate in Installment</Text>
-        <Ionicons name="arrow-forward" size={26} color="#fff" />
-      </TouchableOpacity>
+      {detectedItems.length > 0 && (
+        <TouchableOpacity style={styles.fab} onPress={handleCalculateInstallment}>
+          <Ionicons name="calculator-outline" size={26} color="#fff" />
+          <Text style={styles.fabText}>Calculate in Installment</Text>
+          <Ionicons name="arrow-forward" size={26} color="#fff" />
+        </TouchableOpacity>
+      )}
     </SafeAreaView>
   );
 }
@@ -97,9 +169,29 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f8f8',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: hp(2),
+    fontSize: wp(4),
+    color: '#666',
+  },
   imageContainer: {
     height: 420,
     position: 'relative',
+  },
+  placeholderImage: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#e0e0e0',
+  },
+  placeholderText: {
+    marginTop: hp(2),
+    fontSize: wp(4),
+    color: '#888',
   },
   redesignedImage: {
     width: '100%',
@@ -196,5 +288,16 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginHorizontal: 16,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: hp(8),
+  },
+  emptyText: {
+    marginTop: hp(2),
+    fontSize: wp(4.5),
+    color: '#888',
+    textAlign: 'center',
   },
 });

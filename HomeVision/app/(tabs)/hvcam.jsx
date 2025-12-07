@@ -48,7 +48,7 @@ export default function HVCam() {
 
       // Go to wAIs chat with the image
       router.push({
-        pathname: '/wAIs',
+        pathname: '/(tabs)/wAIschat',
         params: { imageUri: uri },
       });
 

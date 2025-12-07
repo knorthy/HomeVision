@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Image,
@@ -6,82 +6,68 @@ import {
   TouchableOpacity,
   Text,
   ScrollView,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useLocalSearchParams } from 'expo-router';
 import { hp, wp } from '../../helpers/common';
 
-const PRODUCTS = [
-  {
-    id: 1,
-    name: "Carrier 1.0HP Inverter Window AC",
-    price: 25662,
-    image: "https://images.unsplash.com/photo-1585811555431-6e854e16cf7b?w=400&h=400&fit=crop",
-    hot: true,
-    specs: {
-      type: "Window Type",
-      capacity: "1.0 HP",
-      coverage: "12-15 sqm",
-      color: "White",
-      dimensions: "52 x 38 x 30 cm"
-    },
-    description: "Energy-efficient inverter technology for optimal cooling and lower electricity bills."
-  },
-  {
-    id: 2,
-    name: "Condura 6.3cu ft Inverter Two Door",
-    price: 16578,
-    image: "https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?w=400&h=400&fit=crop",
-    hot: true,
-    specs: {
-      capacity: "6.3 cubic feet",
-      type: "Two Door",
-      color: "Silver",
-      dimensions: "144 x 55 x 60 cm",
-      features: "Inverter, Frost-free"
-    },
-    description: "Spacious refrigerator with inverter technology for energy savings and consistent cooling."
-  },
-  {
-    id: 3,
-    name: "Honor 400 5G 512GB/12GB",
-    price: 22999,
-    image: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=400&h=400&fit=crop",
-    hot: true,
-    specs: {
-      storage: "512GB",
-      ram: "12GB",
-      network: "5G",
-      color: "Midnight Black",
-      display: "6.7 inches AMOLED"
-    },
-    description: "Flagship smartphone with powerful performance, ample storage, and blazing-fast 5G connectivity."
-  },
-  {
-    id: 4,
-    name: "Apple iPad A16 11th Gen WiFi",
-    price: 28490,
-    image: "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=400&h=400&fit=crop",
-    hot: false,
-    specs: {
-      processor: "A16 Bionic",
-      display: "11 inches Liquid Retina",
-      storage: "128GB",
-      color: "Space Gray",
-      connectivity: "WiFi 6E"
-    },
-    description: "Powerful tablet with stunning display, perfect for productivity and creative work."
-  }
-];
-
+const BACKEND_INSTALLMENT_URL = 'http://192.168.68.119:8000/installment-items';
 const MONTH_OPTIONS = [6, 12, 18, 24];
 
 export default function InstallmentSimulator() {
+  const params = useLocalSearchParams();
+  const { items: itemsParam, designId } = params;
+  
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [downPayment, setDownPayment] = useState(5000);
   const [selectedMonths, setSelectedMonths] = useState(12);
 
-  const allItemsTotal = PRODUCTS.reduce((sum, p) => sum + p.price, 0);
+  useEffect(() => {
+    fetchInstallmentItems();
+  }, [designId, itemsParam]);
+
+  const fetchInstallmentItems = async () => {
+    try {
+      // If items passed via params, parse them
+      if (itemsParam) {
+        const parsedItems = JSON.parse(itemsParam);
+        setProducts(parsedItems);
+        setLoading(false);
+        return;
+      }
+
+      // Otherwise fetch from backend
+      if (!designId) {
+        setProducts([]);
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch(`${BACKEND_INSTALLMENT_URL}/${designId}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch installment items');
+      }
+
+      const data = await response.json();
+      
+      // Expected format: { items: [{ id, name, price, image, specs?, description? }] }
+      setProducts(data.items || []);
+      
+    } catch (error) {
+      Alert.alert('Error', error.message || 'Failed to load items');
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const allItemsTotal = products.reduce((sum, p) => sum + p.price, 0);
 
   const calculateMonthly = (price, months = selectedMonths) => {
     const remaining = price - downPayment;
@@ -89,7 +75,7 @@ export default function InstallmentSimulator() {
   };
 
   const selectedProductData = selectedProduct 
-    ? PRODUCTS.find(p => p.id === selectedProduct)
+    ? products.find(p => p.id === selectedProduct)
     : null;
 
   const handleProductClick = (productId) => {
@@ -100,9 +86,63 @@ export default function InstallmentSimulator() {
     setSelectedProduct(null);
   };
 
+  const handleApply = async () => {
+    const itemsToApply = showAllItemsPackage ? products : [selectedProductData];
+    
+    try {
+      const response = await fetch(`${BACKEND_INSTALLMENT_URL}/apply`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          designId,
+          items: itemsToApply,
+          downPayment,
+          installmentMonths: selectedMonths,
+          totalAmount: currentPrice,
+          monthlyPayment: calculateMonthly(currentPrice),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to submit application');
+      }
+
+      Alert.alert('Success!', 'Your installment application has been submitted!');
+    } catch (error) {
+      Alert.alert('Error', error.message || 'Failed to submit application');
+    }
+  };
+
   // Determine what to show based on selection
   const showAllItemsPackage = selectedProduct === null;
   const currentPrice = showAllItemsPackage ? allItemsTotal : selectedProductData?.price || 0;
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#E31E24" />
+          <Text style={styles.loadingText}>Loading installment options...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (products.length === 0) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.emptyContainer}>
+          <Ionicons name="cart-outline" size={hp(12)} color="#ccc" />
+          <Text style={styles.emptyTitle}>No Items Available</Text>
+          <Text style={styles.emptySubtitle}>
+            No items found for installment calculation
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -120,35 +160,37 @@ export default function InstallmentSimulator() {
           contentContainerStyle={styles.productScrollContent}
         >
           {/* All Items Card */}
-          <TouchableOpacity
-            onPress={handleAllItemsClick}
-            style={[
-              styles.productCard,
-              selectedProduct === null && styles.productCardSelected
-            ]}
-          >
-            <View style={styles.productImageContainer}>
-              <View style={styles.allItemsBadge}>
-                <Ionicons name="cart" size={hp(2.5)} color="#fff" />
-                <Text style={styles.allItemsText}>ALL</Text>
+          {products.length > 1 && (
+            <TouchableOpacity
+              onPress={handleAllItemsClick}
+              style={[
+                styles.productCard,
+                selectedProduct === null && styles.productCardSelected
+              ]}
+            >
+              <View style={styles.productImageContainer}>
+                <View style={styles.allItemsBadge}>
+                  <Ionicons name="cart" size={hp(2.5)} color="#fff" />
+                  <Text style={styles.allItemsText}>ALL</Text>
+                </View>
+                <View style={styles.allItemsImageContainer}>
+                  <Ionicons name="apps" size={hp(12)} color="#E31E24" />
+                </View>
               </View>
-              <View style={styles.allItemsImageContainer}>
-                <Ionicons name="apps" size={hp(12)} color="#E31E24" />
+              <View style={styles.productInfo}>
+                <Text style={styles.productName} numberOfLines={2}>
+                  Complete Package Deal
+                </Text>
+                <Text style={styles.asLowAs}>as low as</Text>
+                <Text style={styles.productPrice}>
+                  ₱{calculateMonthly(allItemsTotal).toLocaleString()} x {selectedMonths}months
+                </Text>
               </View>
-            </View>
-            <View style={styles.productInfo}>
-              <Text style={styles.productName} numberOfLines={2}>
-                Complete Package Deal
-              </Text>
-              <Text style={styles.asLowAs}>as low as</Text>
-              <Text style={styles.productPrice}>
-                ₱{calculateMonthly(allItemsTotal).toLocaleString()} x {selectedMonths}months
-              </Text>
-            </View>
-          </TouchableOpacity>
+            </TouchableOpacity>
+          )}
 
           {/* Individual Products */}
-          {PRODUCTS.map((product) => (
+          {products.map((product) => (
             <TouchableOpacity
               key={product.id}
               onPress={() => handleProductClick(product.id)}
@@ -195,7 +237,7 @@ export default function InstallmentSimulator() {
               </Text>
               <Text style={styles.packageSubtitle}>
                 {showAllItemsPackage 
-                  ? "All 4 premium items • Best value" 
+                  ? `All ${products.length} items • Best value` 
                   : "Individual item"}
               </Text>
             </View>
@@ -212,15 +254,17 @@ export default function InstallmentSimulator() {
               <Text style={styles.detailDescription}>{selectedProductData.description}</Text>
 
               {/* Specifications */}
-              <View style={styles.specsContainer}>
-                <Text style={styles.specsTitle}>Specifications</Text>
-                {Object.entries(selectedProductData.specs).map(([key, value]) => (
-                  <View key={key} style={styles.specRow}>
-                    <Text style={styles.specKey}>{key}:</Text>
-                    <Text style={styles.specValue}>{value}</Text>
-                  </View>
-                ))}
-              </View>
+              {selectedProductData.specs && (
+                <View style={styles.specsContainer}>
+                  <Text style={styles.specsTitle}>Specifications</Text>
+                  {Object.entries(selectedProductData.specs).map(([key, value]) => (
+                    <View key={key} style={styles.specRow}>
+                      <Text style={styles.specKey}>{key}:</Text>
+                      <Text style={styles.specValue}>{value}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
             </>
           )}
 
@@ -306,7 +350,7 @@ export default function InstallmentSimulator() {
             </View>
           </View>
 
-          <TouchableOpacity style={styles.applyButton}>
+          <TouchableOpacity style={styles.applyButton} onPress={handleApply}>
             <Text style={styles.applyButtonText}>
               {showAllItemsPackage ? "Apply for Complete Package" : "Apply for This Item"}
             </Text>
@@ -321,6 +365,34 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f5f5f5",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: hp(2),
+    fontSize: wp(4),
+    color: "#666",
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: wp(10),
+  },
+  emptyTitle: {
+    fontSize: hp(2.5),
+    fontWeight: 'bold',
+    color: "#333",
+    marginTop: hp(2),
+  },
+  emptySubtitle: {
+    fontSize: hp(1.8),
+    color: "#666",
+    textAlign: 'center',
+    marginTop: hp(1),
   },
   scrollView: {
     flex: 1,

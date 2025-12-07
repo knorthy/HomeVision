@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, router } from 'expo-router';
 import { useState } from 'react';
 import {
   View,
@@ -11,24 +11,73 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { hp, wp } from '../../helpers/common';
+
+const BACKEND_AI_URL = 'http://192.168.68.119:8000/generate-design';
 
 export default function WAIs() {
   const { imageUri } = useLocalSearchParams();
   const [designIdea, setDesignIdea] = useState('');
   const [budget, setBudget] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!designIdea.trim()) {
-      alert('Please describe the design you want');
+      Alert.alert('Input Required', 'Please describe the design you want');
       return;
     }
 
-    // Here you'll send designIdea + budget + imageUri to your AI backend
-    // For now, just show a success message
-    alert(`wAIs is now creating your design!\n\nIdea: ${designIdea}\nBudget: ${budget || 'Not specified'}`);
+    if (!imageUri) {
+      Alert.alert('Image Required', 'Please take or upload an image first');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const formData = new FormData();
+      formData.append('photo', {
+        uri: imageUri,
+        name: 'room.jpg',
+        type: 'image/jpeg',
+      });
+      formData.append('designIdea', designIdea);
+      formData.append('budget', budget || '');
+
+      const response = await fetch(BACKEND_AI_URL, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error('AI request failed: ' + errorText);
+      }
+
+      const result = await response.json();
+      
+      // Success - navigate to results page with the AI response
+      // Expected result format: { designId, generatedImageUrl, items: [...] }
+      router.push({
+        pathname: '/(tabs)/imageDisplay',
+        params: {
+          designId: result.designId || Date.now().toString(),
+          generatedImageUri: result.generatedImageUrl || result.designImageUrl,
+        },
+      });
+
+    } catch (error) {
+      Alert.alert('Error', error.message || 'Failed to generate design. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -80,9 +129,19 @@ export default function WAIs() {
           </View>
 
           {/* Submit Button */}
-          <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-            <Text style={styles.submitText}>Generate My Design</Text>
-            <Ionicons name="sparkles" size={wp(6)} color="#fff" style={{ marginLeft: wp(2.5) }} />
+          <TouchableOpacity 
+            style={[styles.submitButton, loading && { opacity: 0.7 }]} 
+            onPress={handleSubmit}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Text style={styles.submitText}>Generate My Design</Text>
+                <Ionicons name="sparkles" size={wp(6)} color="#fff" style={{ marginLeft: wp(2.5) }} />
+              </>
+            )}
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
