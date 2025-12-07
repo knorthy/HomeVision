@@ -1,86 +1,84 @@
+// app/(tabs)/hvcam.jsx
 import { Camera, CameraView } from 'expo-camera';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
+  Text,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { router } from 'expo-router';
+import { hp, wp } from '../../helpers/common';
 
 const BACKEND_UPLOAD_URL = 'http://192.168.68.119:8000/camera';
 
-export default function CameraTab() {
+export default function HVCam() {
   const [hasPermission, setHasPermission] = useState(null);
   const [cameraType, setCameraType] = useState('back');
-  const cameraRef = useRef(null);
   const [uploading, setUploading] = useState(false);
+  const cameraRef = useRef(null);
 
-  async function uriToBlob(uri) {
-    const response = await fetch(uri);
-    if (!response.ok) throw new Error(`Failed to fetch file: ${response.status}`);
-    return await response.blob();
-  }
-
-  async function uploadUri(uri) {
-    const blob = await uriToBlob(uri);
-    const form = new FormData();
-    form.append('photo', blob, 'photo.jpg');
-
-    const res = await fetch(BACKEND_UPLOAD_URL, {
-      method: 'POST',
-      body: form,
-    });
-
-    const text = await res.text();
-    if (!res.ok) throw new Error(`Upload failed: ${res.status} ${text}`);
-    return text;
-  }
-
-  const handleCapture = async () => {
-    if (!cameraRef.current) return;
-
+  const uploadAndGo = async (uri) => {
     try {
       setUploading(true);
-      const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
-      const resultText = await uploadUri(photo.uri);
-      Alert.alert('Success', resultText || 'Image uploaded successfully!');
+
+      let formData = new FormData();
+      formData.append('photo', {
+        uri: uri,
+        name: 'photo.jpg',
+        type: 'image/jpeg',
+      });
+
+      const response = await fetch(BACKEND_UPLOAD_URL, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error('Upload failed: ' + errorText);
+      }
+
+      // Go to wAIs chat with the image
+      router.push({
+        pathname: '/wAIs',
+        params: { imageUri: uri },
+      });
+
     } catch (error) {
-      Alert.alert('Error', error.message);
+      Alert.alert('Upload Error', error.message);
     } finally {
       setUploading(false);
     }
   };
 
-  const handleUploadFromGallery = async () => {
-    // Request permission
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission required', 'Please allow access to your photos.');
+  const takePhoto = async () => {
+    if (!cameraRef.current) return;
+    const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
+    uploadAndGo(photo.uri);
+  };
+
+  const pickFromGallery = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (permission.status !== 'granted') {
+      Alert.alert('Permission needed', 'Please allow photo access');
       return;
     }
 
-    // Pick image
-    const result = await ImagePicker.launchImageLibraryAsync({
+    let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.8,
-      allowsEditing: false,
     });
 
     if (!result.canceled) {
-      const uri = result.assets[0].uri;
-      try {
-        setUploading(true);
-        const resultText = await uploadUri(uri);
-        Alert.alert('Success', resultText || 'Image uploaded from gallery!');
-      } catch (error) {
-        Alert.alert('Upload failed', error.message);
-      } finally {
-        setUploading(false);
-      }
+      uploadAndGo(result.assets[0].uri);
     }
   };
 
@@ -92,111 +90,98 @@ export default function CameraTab() {
   }, []);
 
   if (hasPermission === null) {
-    return <View style={styles.container}><Text>Requesting permission...</Text></View>;
+    return (
+      <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color="#fff" />
+      </View>
+    );
   }
 
   if (hasPermission === false) {
-    return <View style={styles.container}><Text>No camera access</Text></View>;
+    return (
+      <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center' }}>
+        <Text style={{ color: 'white', textAlign: 'center', fontSize: 18 }}>
+          No access to camera
+        </Text>
+      </View>
+    );
   }
 
   return (
     <View style={styles.container}>
-      <CameraView
-        style={styles.camera}
-        facing={cameraType}
-        ref={cameraRef}
-      />
+      <CameraView style={StyleSheet.absoluteFill} facing={cameraType} ref={cameraRef} />
 
-      {/* Top Flip Button */}
+      {/* Flip Camera */}
       <TouchableOpacity
         style={styles.flipButton}
-        onPress={() => setCameraType(prev => prev === 'back' ? 'front' : 'back')}
-        disabled={uploading}
+        onPress={() => setCameraType(current => (current === 'back' ? 'front' : 'back'))}
       >
-        <Ionicons name="camera-reverse-outline" size={32} color="white" />
+        <Ionicons name="camera-reverse" size={wp(8)} color="white" />
       </TouchableOpacity>
 
       {/* Bottom Controls */}
-      <View style={styles.bottomControls}>
-        {/* Upload from Gallery Button */}
-        <TouchableOpacity
-          style={styles.galleryButton}
-          onPress={handleUploadFromGallery}
-          disabled={uploading}
-        >
-          <Ionicons name="images-outline" size={28} color="white" />
+      <View style={styles.bottomBar}>
+        <TouchableOpacity style={styles.galleryButton} onPress={pickFromGallery} disabled={uploading}>
+          <Ionicons name="images-outline" size={wp(8)} color="white" />
         </TouchableOpacity>
 
-        {/* Capture Button */}
         <TouchableOpacity
-          style={[styles.captureButton, uploading && styles.captureButtonDisabled]}
-          onPress={handleCapture}
+          style={[styles.captureButton, uploading && { opacity: 0.6 }]}
+          onPress={takePhoto}
           disabled={uploading}
         >
           {uploading ? (
-            <ActivityIndicator color="#fff" size="large" />
+            <ActivityIndicator size="large" color="#fff" />
           ) : (
-            <View style={styles.captureInnerCircle} />
+            <View style={styles.innerCircle} />
           )}
         </TouchableOpacity>
 
-        {/* Empty space on left for symmetry */}
-        <View style={{ width: 60 }} />
+        <View style={{ width: 70 }} />
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: 'black',
-  },
-  camera: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   flipButton: {
     position: 'absolute',
-    top: 50,
-    right: 20,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    borderRadius: 30,
-    padding: 12,
+    top: hp(7),
+    right: wp(5),
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    padding: wp(4),
+    borderRadius: wp(13),
   },
-  bottomControls: {
+  bottomBar: {
     position: 'absolute',
-    bottom: 40,
+    bottom: hp(6),
     left: 0,
     right: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 30,
+    paddingHorizontal: wp(8),
+  },
   galleryButton: {
     backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 30,
-    padding: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: wp(4),
+    borderRadius: wp(10),
   },
   captureButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: wp(21),
+    height: wp(21),
+    borderRadius: wp(10.5),
     backgroundColor: 'rgba(255,255,255,0.3)',
-    borderWidth: 6,
-    borderColor: 'white',
+    borderWidth: wp(1.8),
+    borderColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  },
-  captureButtonDisabled: {
-    opacity: 0.7,
-  },
-  captureInnerCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+  innerCircle: {
+    width: wp(17),
+    height: wp(17),
+    borderRadius: wp(8.5),
     backgroundColor: 'white',
   },
 });
