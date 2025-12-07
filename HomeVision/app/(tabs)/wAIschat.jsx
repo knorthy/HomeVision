@@ -39,8 +39,8 @@ export default function WAIs() {
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
           {/* Header */}
-          <Text style={styles.title}>wAIs</Text>
-          <Text style={styles.subtitle}>Describe the design you want to wAIs</Text>
+          <Text style={styles.title}>HomeVision</Text>
+          <Text style={styles.subtitle}>Describe the design you want to HomeVision</Text>
 
           {/* Big Image Box */}
           <View style={styles.imageBox}>
@@ -69,10 +69,10 @@ export default function WAIs() {
 
           {/* Input 2: Budget */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Budget (optional)</Text>
+            <Text style={styles.label}>Be wAIs with your budget</Text>
             <TextInput
               style={[styles.textInput, { height: hp(7.5) }]}
-              placeholder="e.g. ₱50,000 - ₱100,000"
+              placeholder="Tell wAIs your budget"
               placeholderTextColor="#aaa"
               value={budget}
               onChangeText={setBudget}

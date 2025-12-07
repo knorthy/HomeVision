@@ -1,4 +1,3 @@
-// app/(tabs)/wAIs.jsx
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -55,7 +54,7 @@ export default function WAIsResult() {
           />
           <View style={styles.overlay}>
             <Ionicons name="sparkles" size={32} color="#fff" />
-            <Text style={styles.overlayText}>Your Dream Room by wAIs</Text>
+            <Text style={styles.overlayText}>Your Dream Room by HomeVision</Text>
           </View>
         </View>
 
